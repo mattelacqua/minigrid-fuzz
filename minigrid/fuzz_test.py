@@ -122,7 +122,7 @@ if __name__ == "__main__":
     legal_moves = list(fuzz.env.Actions)[0:6] # First 3 actions for lava test
     population = initialize_population(fuzz, args.pop_size, legal_moves)
 
-    max_fitness, max_fitness_trace, max_fitness_trial, generational_stats, population, final_fitness, final_population = \
+    max_fitness, max_fitness_trace, max_fitness_trial, generational_stats, population, final_fitness, final_population, winners = \
         genetic_algorithm(fuzz, legal_moves, population, args.generations, args.crossover, args.mutation, generational_stats, 0)
 
     #for stat in generational_stats:
@@ -137,10 +137,12 @@ if __name__ == "__main__":
     
 
     # Play out the winning scenaro
-    fuzz.start(render=True)
-    for move in max_fitness_trace:
-        time.sleep(0.5)
-        fuzz.step(move, render=True) 
+    for winner in winners:
+        print(winner)
+        fuzz.start(render=True)
+        for move in max_fitness_trace:
+            time.sleep(0.25)
+            fuzz.step(move, render=True) 
 
 
     

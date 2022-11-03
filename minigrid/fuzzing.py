@@ -43,7 +43,7 @@ def get_fitness(game, trace):
             elif action == env.Actions.forward:
                 trial["fitness"] += 1 # Reward exploration and making good moves
             elif action == env.Actions.left or action ==env.Actions.right:
-                trial["fitness"] -= 0.25 # negative reward for turning (this way if they keep turning its bad)
+                trial["fitness"] -= 0.5 # negative reward for turning (this way if they keep turning its bad)
 
         visited_states.add(tuple(curr_pos))
 
@@ -132,8 +132,6 @@ def genetic_algorithm(game, legal_moves, population, max_generation, probability
 
         # Mutate the entire population by potentially increasing (wrap around) digits 2 and 3 of every single state. (chance for random reset of 0
         # as well)
-        # If elite 2's index changes from removal of 1
-        # INSTEAD OF REMOVAL JUST CHANGE WHAT THINGS ARE GETTING SET TO!!!
         population = mutate_population(population, probability_mutation, legal_moves)
        
         # Put back in the the elites
