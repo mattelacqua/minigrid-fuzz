@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-
+from argparse import Action
 import gymnasium as gym
 
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.utils.window import Window
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
+import random
+import time
 
-class ManualControl:
+import fuzzing
+
+class DFS:
     def __init__(
         self,
         env: MiniGridEnv,
@@ -24,38 +28,44 @@ class ManualControl:
         self.window = window
         self.window.reg_key_handler(self.key_handler)
 
-    def start(self):
+    def start(self, render=False):
         """Start the window display with blocking event loop"""
-        self.reset(self.seed)
-        self.window.show(block=True)
+        self.reset(self.seed, render=render)
+        if render:
+            self.window.show(block=False)
 
-    def step(self, action: MiniGridEnv.Actions):
-        obs, reward, terminated, truncated, _ = self.env.step(action)
-        #print(f"step={self.env.step_count}, reward={reward:.2f}")
+    def step(self, action: MiniGridEnv.Actions, render=False):
+        _, reward, terminated, truncated, _ = self.env.step(action)
+        if render: 
+            print(f"action={action.name} step={self.env.step_count}, reward={reward:.2f}")
 
         if terminated:
-            print("terminated!")
-            self.reset(self.seed)
+            if render: 
+                print("terminated!")
+            #self.reset(self.seed)
         elif truncated:
-            print("truncated!")
-            self.reset(self.seed)
-        else:
-            self.redraw()
+            if render:
+                print("truncated!")
+            #self.reset(self.seed)
 
-        return obs, reward, terminated, truncated
+        if render:
+            self.redraw()
+        
+        return _, reward, terminated, truncated, _
 
     def redraw(self):
         frame = self.env.get_frame(agent_pov=self.agent_view)
         self.window.show_img(frame)
 
-    def reset(self, seed=None):
+    def reset(self, seed=None, render=False):
         self.env.reset(seed=seed)
 
-        if hasattr(self.env, "mission"):
-            print("Mission: %s" % self.env.mission)
-            self.window.set_caption(self.env.mission)
+        #if hasattr(self.env, "mission"):
+        #    print("Mission: %s" % self.env.mission)
+        #    self.window.set_caption(self.env.mission)
 
-        self.redraw()
+        if render:
+            self.redraw()
 
     def key_handler(self, event):
         key: str = event.key
@@ -67,21 +77,6 @@ class ManualControl:
         if key == "backspace":
             self.reset()
             return
-
-        key_to_action = {
-            "left": MiniGridEnv.Actions.left,
-            "right": MiniGridEnv.Actions.right,
-            "up": MiniGridEnv.Actions.forward,
-            " ": MiniGridEnv.Actions.toggle,
-            "pageup": MiniGridEnv.Actions.pickup,
-            "pagedown": MiniGridEnv.Actions.drop,
-            "enter": MiniGridEnv.Actions.done,
-        }
-
-        action = key_to_action[key]
-        self.step(action)
-        print(vars(self.env.grid))
-
 
 if __name__ == "__main__":
     import argparse
@@ -115,5 +110,19 @@ if __name__ == "__main__":
         env = RGBImgPartialObsWrapper(env, env.tile_size)
         env = ImgObsWrapper(env)
 
-    manual_control = ManualControl(env, agent_view=args.agent_view, seed=args.seed)
-    manual_control.start()
+    dfs = DFS(env, agent_view=args.agent_view, seed=args.seed)
+
+    
+    #time.sleep(500)
+    traces = []
+    preferences = ['u', 'd', 'l', 'r']
+    for i in preferences:
+        dfs.start(render=True)
+        actions = fuzzing.get_first_trace(dfs, preference_order=i)
+
+        dfs.start(render=True)
+        time.sleep(2)
+        for action in actions:
+            time.sleep(0.5)
+            dfs.step(action, render=True)
+

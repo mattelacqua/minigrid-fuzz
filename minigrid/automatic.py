@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-
 import gymnasium as gym
 
 from minigrid.minigrid_env import MiniGridEnv
 from minigrid.utils.window import Window
 from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
 
+import random
+import time
 
-class ManualControl:
+class AutomaticControl:
     def __init__(
         self,
         env: MiniGridEnv,
@@ -27,11 +28,11 @@ class ManualControl:
     def start(self):
         """Start the window display with blocking event loop"""
         self.reset(self.seed)
-        self.window.show(block=True)
+        self.window.show(block=False)
 
     def step(self, action: MiniGridEnv.Actions):
-        obs, reward, terminated, truncated, _ = self.env.step(action)
-        #print(f"step={self.env.step_count}, reward={reward:.2f}")
+        _, reward, terminated, truncated, _ = self.env.step(action)
+        print(f"step={self.env.step_count}, reward={reward:.2f}")
 
         if terminated:
             print("terminated!")
@@ -41,8 +42,6 @@ class ManualControl:
             self.reset(self.seed)
         else:
             self.redraw()
-
-        return obs, reward, terminated, truncated
 
     def redraw(self):
         frame = self.env.get_frame(agent_pov=self.agent_view)
@@ -68,20 +67,13 @@ class ManualControl:
             self.reset()
             return
 
-        key_to_action = {
-            "left": MiniGridEnv.Actions.left,
-            "right": MiniGridEnv.Actions.right,
-            "up": MiniGridEnv.Actions.forward,
-            " ": MiniGridEnv.Actions.toggle,
-            "pageup": MiniGridEnv.Actions.pickup,
-            "pagedown": MiniGridEnv.Actions.drop,
-            "enter": MiniGridEnv.Actions.done,
-        }
-
-        action = key_to_action[key]
+    def choose_random_action(self):
+        random.seed = self.seed
+        print("Actions")
+        print(MiniGridEnv.Actions)
+        action = random.choice(list(MiniGridEnv.Actions))
+        print(action)
         self.step(action)
-        print(vars(self.env.grid))
-
 
 if __name__ == "__main__":
     import argparse
@@ -115,5 +107,10 @@ if __name__ == "__main__":
         env = RGBImgPartialObsWrapper(env, env.tile_size)
         env = ImgObsWrapper(env)
 
-    manual_control = ManualControl(env, agent_view=args.agent_view, seed=args.seed)
-    manual_control.start()
+    automatic = AutomaticControl(env, agent_view=args.agent_view, seed=args.seed)
+    automatic.start()
+    while True:
+        automatic.choose_random_action()
+        print(automatic.env.agent_pos)
+        print(vars(automatic.env.grid))
+        time.sleep(1)

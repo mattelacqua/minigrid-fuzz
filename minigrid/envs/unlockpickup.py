@@ -101,6 +101,7 @@ class UnlockPickupEnv(RoomGrid):
         if action == self.actions.pickup:
             if self.carrying and self.carrying == self.obj:
                 reward = self._reward()
+                #reward = 1
                 terminated = True
 
         return obs, reward, terminated, truncated, info
