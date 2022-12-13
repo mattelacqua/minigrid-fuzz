@@ -91,7 +91,6 @@ class UnlockPickupEnv(RoomGrid):
         self.add_object(0, 0, "key", door.color)
 
         self.place_agent(0, 0)
-
         self.obj = obj
         self.mission = f"pick up the {obj.color} {obj.type}"
 

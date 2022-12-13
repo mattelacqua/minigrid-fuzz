@@ -122,6 +122,7 @@ class MiniGridEnv(gym.Env):
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
+        #print(seed)
 
         # Reinitialize episode-specific variables
         self.agent_pos = (-1, -1)

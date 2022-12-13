@@ -326,7 +326,7 @@ class RoomGrid(MiniGridEnv):
 
         # Find a position that is not right in front of an object
         while True:
-            super().place_agent(room.top, room.size, rand_dir, max_tries=1000)
+            super().place_agent(room.top, room.size, rand_dir=False, max_tries=1000)
             front_cell = self.grid.get(*self.front_pos)
             if front_cell is None or front_cell.type == "wall":
                 break

@@ -36,7 +36,7 @@ class Fuzz:
     def step(self, action: MiniGridEnv.Actions, render=False):
         _, reward, terminated, truncated, _ = self.env.step(action)
         if render: 
-            print(f"step={self.env.step_count}, reward={reward:.2f}")
+            print(f"action={action.name} step={self.env.step_count}, reward={reward:.2f}")
             print(f"carrying={self.env.carrying}")
 
         if terminated:
