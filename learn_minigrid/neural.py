@@ -5,7 +5,8 @@ class MinigridNet(nn.Module):
   
     def __init__(self, input_dim, output_dim):
         super().__init__()
-        h, w, c = input_dim
+        print(input_dim)
+        c, h, w = input_dim
         
         if h != 84:
             raise ValueError(f"Expecting input height: {84}, got: {h}")

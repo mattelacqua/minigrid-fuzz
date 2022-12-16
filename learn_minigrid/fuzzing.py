@@ -10,7 +10,9 @@ import time
 def fuzz(unwrapped_env, env, search_trace, population_size=100, num_generations=100, elite_cull_ratio=0.10, probability_crossover=0.3, probability_mutation=0.2):
     # Randomly initialize population
     env.reset()
+
     starting_position = env.agent_pos
+
     key_steps, door_steps, box_steps, key_start_dir, door_start_dir, box_start_dir = search_trace
 
     # For the keys
@@ -50,31 +52,24 @@ def fuzz(unwrapped_env, env, search_trace, population_size=100, num_generations=
     print(f"Good door {len(success_door_traces)}")
     print(f"Good box {len(success_box_traces)}")
 
-    precursor_steps = [min(success_key_traces, key=len), min(success_door_traces, key=len), min(success_box_traces, key=len)]
     #env.render()
     unwrapped_env.env.render_mode = 'human'
     
-    for trace in success_key_traces:
-        env.reset()
-        print(f"Starting Dir {env.agent_dir}")
-        for step in trace:
-            time.sleep(0.7)
-            print(f"{step.name}")
-            env.step(step)
-        print(f"Ending Dir {env.agent_dir}")
-        time.sleep(2)
 
+    # Testing loop to see how a random choice of a successful trace is working
     while True:
+        precursor_steps = [random.choice(success_key_traces), random.choice(success_door_traces), random.choice(success_box_traces)]
         env.reset()
         for step_set in precursor_steps:
             for step in step_set:
-                print(f"Agent Direction {env.agent_dir} Is moving {step.name}")
-                time.sleep(1.5)
+                #print(f"Agent Direction {env.agent_dir} Is moving {step.name}")
+                time.sleep(0.3)
                 env.step(step)
 
     return 
 
 
+# Randomly initialize the rest of the population
 def initialize_pop(env, population, population_size):
     grid_size = env.room_size * env.room_size
     for trace in range(0, population_size-1):
@@ -85,6 +80,7 @@ def initialize_pop(env, population, population_size):
     return population.copy()
 
 
+# Perform the GA
 def genetic_algorithm(unwrapped_env, env, population, \
                         population_size=100, \
                         num_generations=100, \
@@ -114,10 +110,9 @@ def genetic_algorithm(unwrapped_env, env, population, \
         fitness = []
         action_paths = []
         trials = []
-        init_directions = []
         pop_no_extra_moves = []
         for trace in population:
-            # Choose a random successful precursory steps
+            # Choose fastest successful precursory steps
             if goal == 'door':
                 precursor_steps = [min(key_traces, key=len)]
             if goal == 'box':
@@ -125,7 +120,6 @@ def genetic_algorithm(unwrapped_env, env, population, \
             trial = get_fitness(env, trace, goal, precursor_steps)
             fitness.append(trial["fitness"])
             trials.append(trial.copy())
-            #init_directions.append(trial['init_direction'])
             pop_no_extra_moves.append(trial["actual_path"].copy())
             action_paths.append(trial["action_path"].copy())
         
@@ -142,16 +136,15 @@ def genetic_algorithm(unwrapped_env, env, population, \
         generational_stats.append(this_generation_stats)
 
         
-        # Reward is for reaching the goal. Will get 100. Minus 2 for repeat states, so any positive value will have reached goal.
         optimal_value = env.max_steps - (env.room_size * env.room_size)
-        print(f"max steps {env.max_steps} room_size {env.room_size}, optimal_value {optimal_value}")
+        #print(f"max steps {env.max_steps} room_size {env.room_size}, optimal_value {optimal_value}")
         successful_traces_fit = list(filter(lambda x: x > optimal_value, fitness))
         for successful_fitness in successful_traces_fit:
             successful_trace = action_paths[fitness.index(successful_fitness)]
             winner = tuple(successful_trace.copy())
             winners.add(winner)
 
-        print(f"Fitness: {fitness} MaxFitness {max_fitness} Avg Fitness = {avg_fitness} > {0} = {len(successful_traces_fit)} total = {len(winners)}")
+        #print(f"Fitness: {fitness} MaxFitness {max_fitness} Avg Fitness = {avg_fitness} > {0} = {len(successful_traces_fit)} total = {len(winners)}")
         
         # Take our population of individual and get the top n% for later
         elites, elite_indexes = select_max(population, fitness, elite_cull_count)
@@ -172,6 +165,8 @@ def genetic_algorithm(unwrapped_env, env, population, \
 
 
     return list(winners)
+
+# Evaluate fuzz trace fitness and filter illegal steps out
 def get_fitness(env, trace, goal, precursor_steps):
     #time.sleep(3)
     
@@ -193,7 +188,7 @@ def get_fitness(env, trace, goal, precursor_steps):
     visited_states = set() 
 
     env.reset()
-    print(f"fitness starting dir {env.agent_dir}")
+    #print(f"fitness starting dir {env.agent_dir}")
     for step_set in precursor_steps:
         # do the precursor steps
         for step in step_set:
@@ -202,12 +197,17 @@ def get_fitness(env, trace, goal, precursor_steps):
     for action in trace:
 
         # add to actual path
-        trial['actual_path'].append(action)
+        # TODO: MAYBE CHECK LEGAL PATH?
         step_actions = objective_moves(env, action, env.Actions.forward)
         
         # Get our current position
         curr_pos = env.agent_pos
-        visited_states.add(tuple(curr_pos))
+        starting_pos = curr_pos
+        if tuple(curr_pos) in visited_states: # Not turning and repeat state
+            trial["repeat_states"] += 1
+            trial["fitness"] -= 20 # Strongish punishment to cut off agents that repeat states.
+        else:
+            visited_states.add(tuple(curr_pos))
 
         # do the actions of the directional udlr step
         for move in step_actions:
@@ -226,8 +226,13 @@ def get_fitness(env, trace, goal, precursor_steps):
             # Reward shaping ( if repeat action)
             if tuple(curr_pos) in visited_states and action == env.Actions.forward: # Not turning and repeat state
                 trial["repeat_states"] += 1
-                trial["fitness"] -= 2 # Small negative reward
+                trial["fitness"] -= 10 # Strongish punishment to cut off agents that repeat states.
         
+        after_move_pos = env.agent_pos
+        # Only add the path if it actual moves us (no nonsense with going into walls a lot)
+        if starting_pos != after_move_pos:
+            trial['actual_path'].append(action)
+
         # if we are at a goal, add actions to pickup/unlock and then step on the tile.
         found_goal = is_goal(env, curr_pos, goal=goal, next_to_goal=True)
         
@@ -276,12 +281,13 @@ def get_fitness(env, trace, goal, precursor_steps):
                 trial['action_path'].extend([env.Actions.right])
                 env.step(env.Actions.right)
 
-            if env.agent_dir != 0:
-                print(f"Fitness Ending dir {env.agent_dir}")
+            #if env.agent_dir != 0:
+            #    print(f"Fitness Ending dir {env.agent_dir}")
             
             return trial
 
     return trial
+
 # Perform singlepoint crossover based on crossover probability
 def crossover(parent1, parent2, probability_crossover):
 
@@ -460,9 +466,9 @@ def get_first_traces(env, preference_order='u'): # preference order is what node
 
     #total_actions = to_key + pickup_key + to_door + unlock_door + drop_key + to_box + pickup_box
 
-    print(f"key_actions: {key_actions}")
-    print(f"door_actions: {door_actions}")
-    print(f"box_actions: {box_actions}")
+    #print(f"key_actions: {key_actions}")
+    #print(f"door_actions: {door_actions}")
+    #print(f"box_actions: {box_actions}")
 
     return (key_actions, door_actions, box_actions, key_start_dir, door_start_dir, box_start_dir)
 

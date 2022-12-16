@@ -27,8 +27,13 @@ class Agent:
         # Expert memory can grow indefinitely
         self.expert_memory = deque()
         self.use_cuda = torch.cuda.is_available()
+        self.use_mps = torch.has_mps
         #print(self.use_cuda)
-        self.device = 'cuda' if self.use_cuda else 'cpu'
+        if self.use_cuda:
+            self.device = 'cuda' 
+        elif self.use_mps:
+            self.device = 'mps' 
+        else: 'cpu'
         self.batch_size = params.getint('TRAINING', 'BATCH_SIZE')
 
         self.pretrain_steps = params.getint('TRAINING', 'PRETRAIN_STEPS')
@@ -57,11 +62,14 @@ class Agent:
         self.expert_cache_save = []
         
         log.debug(f"Cuda available: {self.use_cuda}")
+        log.debug(f"MPS available: {self.use_mps}")
 
         # Minigrid's DNN to predict the most optimal action - we implement this in the Learn section
         self.net = MinigridNet(self.state_dim, self.action_dim).float()
         if self.use_cuda:
             self.net = self.net.to(device='cuda')
+        elif self.use_mps:
+            self.net = self.net.to(device='mps')
 
         if checkpoint:
             log.debug(f"Loading previous checkpoint: {checkpoint}")

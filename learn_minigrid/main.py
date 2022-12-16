@@ -9,7 +9,7 @@ import minigrid
 import torch
 from minigrid.wrappers import FullyObsWrapper, ReseedWrapper, ImgObsWrapper, RGBImgObsWrapper
 from wrappers import ResizeObservation, SkipFrame
-from gym.wrappers import TransformObservation
+from gym.wrappers import TransformObservation, FrameStack
 from agent import Agent
 import numpy as np
 
@@ -21,6 +21,8 @@ import gymnasium as gym
 from gym import spaces
 from metrics import MetricLogger, EvaluationLogger
 from agent import Agent
+import platform
+#print(platform.platform())
 
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
@@ -34,7 +36,7 @@ handler.setLevel(logging.DEBUG)
 log.addHandler(handler)
 
 params = configparser.ConfigParser()
-seed = 3
+seed = 0
 
 eval_logger = None
 
@@ -78,11 +80,12 @@ def setup_env():
     #exit(0)
     
     # Apply Wrappers to environment
+    env = ReseedWrapper(env, seeds=[seed])
     env = RGBImgObsWrapper(env)
     env = ImgObsWrapper(env)
-    env = TransformObservation(env, f=lambda x: x / 255.)
     env = ResizeObservation(env, shape=84)
-    env = ReseedWrapper(env, seeds=[seed])
+    env = TransformObservation(env, f=lambda x: x / 255.)
+    env = FrameStack(env, num_stack=4)
 
     #print(env.observation_space)
 
@@ -109,7 +112,7 @@ def run(env, unwrapped_env, eval_mode):
         log.fatal("Checkpoint not found")
         exit(-1)
 
-    agent = Agent(state_dim=env.observation_space.shape, action_dim=env.action_space.n, save_dir=save_dir, params=params,
+    agent = Agent(state_dim=(4, 84, 84), action_dim=env.action_space.n, save_dir=save_dir, params=params,
                   checkpoint=checkpoint,load_only_conv=load_only_conv, env_w=env.width, env_h=env.height)
 
     if eval_mode:
@@ -299,7 +302,7 @@ def pretrain_agent(agent, runs):
         if n_refresh_expert > 0 and i > 0 and i % n_refresh_expert == 0:
             agent.refresh_expert_cache()
         
-def train_agent(agent, env, unwrapped_env):
+def train_agent(agent:Agent, env, unwrapped_env):
     global params
 
     # Read settings for RL mode
@@ -325,7 +328,7 @@ def train_agent(agent, env, unwrapped_env):
         e = agent.curr_episode
         log.debug(f"Running episode {e}")
 
-        state = env.reset()
+        state, _ = env.reset()
         state = torch.from_numpy(np.array(state)).float()
 
         episode = []
